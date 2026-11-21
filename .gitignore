@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+dev-dist/
+*.tsbuildinfo
+
+# TLS (generated locally)
+certs/
+
+# Runtime data
+data/icons/
+data/settings.json
+
+# Logs and caches
+*.log
+npm-debug.log*
+.vite/
+.cache/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
