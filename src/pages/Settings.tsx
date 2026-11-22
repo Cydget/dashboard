@@ -15,6 +15,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useNavigate } from 'react-router-dom';
 import ConnectionChip from '../components/ConnectionChip';
+import InstallButton from '../components/InstallButton';
+import PwaFooter from '../components/PwaFooter';
 import { useDashboardContext } from '../context/DashboardContext';
 import type { IconSize } from '../types';
 import { appUrls, parseUrlLines } from '../utils/urls';
@@ -37,6 +39,7 @@ export default function Settings() {
 
   const [name, setName] = useState('');
   const [urlText, setUrlText] = useState('');
+  const [iconUrl, setIconUrl] = useState('');
   const [extraUrl, setExtraUrl] = useState<Record<string, string>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -47,10 +50,12 @@ export default function Settings() {
       name: name.trim() || urls[0],
       url: urls[0],
       urls,
+      icon: iconUrl.trim() || undefined,
       iconSize: settings.iconSize,
     });
     setName('');
     setUrlText('');
+    setIconUrl('');
   };
 
   const addUrlToApp = (id: string) => {
@@ -87,6 +92,7 @@ export default function Settings() {
         <Typography variant="h6" sx={{ flex: 1 }}>
           Settings
         </Typography>
+        <InstallButton />
         <ConnectionChip />
       </Box>
 
@@ -106,6 +112,14 @@ export default function Settings() {
                 onChange={(e) => setUrlText(e.target.value)}
                 multiline
                 minRows={2}
+                fullWidth
+              />
+              <TextField
+                label="Icon URL (optional)"
+                placeholder="https://example.com/icon-512.png"
+                helperText="Leave blank to auto-pick the largest apple-touch / PWA icon from the site."
+                value={iconUrl}
+                onChange={(e) => setIconUrl(e.target.value)}
                 fullWidth
               />
               <Button variant="contained" onClick={add}>
@@ -174,6 +188,15 @@ export default function Settings() {
                       <AddIcon />
                     </IconButton>
                   </Box>
+                  <TextField
+                    variant="standard"
+                    label="Icon URL"
+                    placeholder="Auto (highest-resolution site icon)"
+                    value={app.icon ?? ''}
+                    onChange={(e) => updateApp(app.id, { icon: e.target.value.trim() || undefined })}
+                    fullWidth
+                    sx={{ mt: 1 }}
+                  />
                 </Box>
               ))}
             </Stack>
@@ -239,6 +262,8 @@ export default function Settings() {
           </Paper>
         </Stack>
       </Container>
+
+      <PwaFooter />
 
       <Snackbar open={Boolean(message)} autoHideDuration={4000} onClose={() => setMessage(null)}>
         <Alert severity="info" onClose={() => setMessage(null)}>

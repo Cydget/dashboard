@@ -7,6 +7,8 @@ import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import { useNavigate } from 'react-router-dom';
 import AppTile from '../components/AppTile';
 import ConnectionChip from '../components/ConnectionChip';
+import InstallButton from '../components/InstallButton';
+import PwaFooter from '../components/PwaFooter';
 import { useDashboardContext } from '../context/DashboardContext';
 import type { IconSize } from '../types';
 
@@ -60,6 +62,7 @@ export default function Home() {
         <Typography variant="h6" sx={{ flex: 1, fontWeight: 700 }}>
           Dashboard
         </Typography>
+        <InstallButton light />
         <ConnectionChip />
         <IconButton color="inherit" onClick={() => navigate('/health')} aria-label="health">
           <MonitorHeartIcon />
@@ -131,6 +134,7 @@ export default function Home() {
           ))}
         </Box>
       )}
+      <PwaFooter light />
     </Box>
   );
 }

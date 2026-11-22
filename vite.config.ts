@@ -1,16 +1,44 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8')) as { version: string };
+const appVersion = pkg.version;
+const appBuildTime = new Date().toISOString();
 const keyPath = path.join(rootDir, 'certs', 'key.pem');
 const certPath = path.join(rootDir, 'certs', 'cert.pem');
 const https = fs.existsSync(keyPath) && fs.existsSync(certPath)
   ? { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }
   : undefined;
+
+function versionPlugin(): Plugin {
+  const payload = JSON.stringify({ version: appVersion, buildTime: appBuildTime }, null, 2);
+  return {
+    name: 'dashboard-version',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.split('?')[0] === '/version.json') {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(payload);
+          return;
+        }
+        next();
+      });
+    },
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: payload,
+      });
+    },
+  };
+}
 
 const apiProxy = {
   '/api': {
@@ -20,14 +48,24 @@ const apiProxy = {
 };
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __APP_BUILD_TIME__: JSON.stringify(appBuildTime),
+  },
   plugins: [
     react(),
+    versionPlugin(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      injectRegister: false,
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       devOptions: {
         enabled: true,
         type: 'module',
+        navigateFallback: 'index.html',
       },
       manifest: {
         name: 'Dashboard App',
@@ -36,7 +74,6 @@ export default defineConfig({
         theme_color: '#1976d2',
         background_color: '#1a1a2e',
         display: 'standalone',
-        orientation: 'portrait',
         scope: '/',
         start_url: '/',
         icons: [
@@ -44,31 +81,26 @@ export default defineConfig({
             src: 'pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
+            purpose: 'any',
           },
           {
             src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable',
+            purpose: 'any',
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 4,
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 5,
-              },
-            },
-          },
-        ],
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2,webmanifest}'],
+        globIgnores: ['**/version.json'],
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
     }),
   ],

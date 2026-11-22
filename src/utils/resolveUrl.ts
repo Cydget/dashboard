@@ -1,4 +1,6 @@
 import type { AppConfig, HealthLevel } from '../types';
+import { iconProxyUrl } from '../services/api';
+import { persistIconFromUrl } from './iconCache';
 import { appUrls } from './urls';
 
 export type ProbeMethod = 'icon' | 'http';
@@ -61,7 +63,7 @@ export function iconCandidates(pageUrl: string, customIcon?: string): string[] {
       candidates.push(customIcon);
     }
   }
-  candidates.push(`${origin}/favicon.ico`, `${origin}/favicon.png`, `${origin}/apple-touch-icon.png`);
+  candidates.push(`${origin}/apple-touch-icon.png`, `${origin}/favicon.png`, `${origin}/favicon.ico`);
   return [...new Set(candidates)];
 }
 
@@ -81,11 +83,11 @@ function probeImage(src: string): Promise<boolean> {
 }
 
 async function firstWorkingIcon(pageUrl: string, customIcon?: string): Promise<string | null> {
-  for (const src of iconCandidates(pageUrl, customIcon)) {
-    const ok = await withTimeout(probeImage(src), ICON_TIMEOUT_MS, false);
-    if (ok) return src;
-  }
-  return null;
+  const sources = iconCandidates(pageUrl, customIcon);
+  const hits = await Promise.all(
+    sources.map(async (src) => ((await withTimeout(probeImage(src), ICON_TIMEOUT_MS, false)) ? src : null)),
+  );
+  return hits.find((src) => Boolean(src)) ?? null;
 }
 
 async function httpStatus200(url: string): Promise<{ ok: boolean; status?: number; error?: string }> {
@@ -151,11 +153,18 @@ export async function resolveApp(app: AppConfig): Promise<AppResolution> {
   const httpHit = probes.find((probe) => probe.ok && probe.method === 'http');
   const winner = iconHit ?? httpHit;
   const timedOut = probes.length > 0 && probes.every((probe) => probe.error === 'timeout');
+  const pageUrl = winner?.url ?? urls[0] ?? null;
+  const iconSrc = app.icon || winner?.iconSrc || null;
+  if (pageUrl) {
+    void persistIconFromUrl(app.id, iconProxyUrl(pageUrl));
+  } else if (iconSrc) {
+    void persistIconFromUrl(app.id, iconSrc);
+  }
   return {
     appId: app.id,
     resolvedUrl: winner?.url ?? null,
     method: winner?.method ?? null,
-    iconSrc: winner?.iconSrc ?? null,
+    iconSrc,
     probes,
     status: winner ? 'healthy' : timedOut ? 'timeout' : urls.length ? 'unhealthy' : 'unknown',
     lastChecked: new Date().toISOString(),

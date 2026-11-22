@@ -14,7 +14,10 @@ export async function pingBackend(timeoutMs = 4000): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`${apiBase()}/api/status`, { signal: controller.signal });
+    const response = await fetch(`${apiBase()}/api/status`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    });
     return response.ok;
   } catch {
     return false;

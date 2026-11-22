@@ -27,12 +27,19 @@ export const useHealthCheck = (apps: AppConfig[], interval: number) => {
     let cancelled = false;
 
     const checkAllApps = async () => {
+      if (!navigator.onLine) return;
       const entries = await Promise.all(appsRef.current.map((app) => resolveApp(app)));
       if (cancelled) return;
       setResolutions((previous) => {
         const next = new Map(previous);
         for (const resolution of entries) {
-          next.set(resolution.appId, resolution);
+          const prior = previous.get(resolution.appId);
+          const keepPrior =
+            prior &&
+            prior.status === 'healthy' &&
+            resolution.status !== 'healthy' &&
+            !navigator.onLine;
+          next.set(resolution.appId, keepPrior ? prior : resolution);
         }
         const persisted: Record<string, AppResolution> = {};
         for (const [id, value] of next) persisted[id] = value;

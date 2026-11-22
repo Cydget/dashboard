@@ -1,6 +1,10 @@
+import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import type { AppConfig, HealthLevel, IconSize } from '../types';
+import { useDashboardContext } from '../context/DashboardContext';
+import { iconProxyUrl } from '../services/api';
+import { getCachedIcon, persistIconFromUrl } from '../utils/iconCache';
 import { appUrls } from '../utils/urls';
 import type { AppResolution } from '../utils/resolveUrl';
 
@@ -23,12 +27,49 @@ export default function AppTile({
   defaultSize: IconSize;
   resolution?: AppResolution;
 }) {
+  const { isOnline } = useDashboardContext();
   const size = SIZE_PX[app.iconSize || defaultSize];
   const candidates = appUrls(app);
   const resolvedUrl = resolution?.resolvedUrl || candidates[0] || app.url;
-  const src = app.icon || resolution?.iconSrc || null;
+  const directSrc = app.icon || resolution?.iconSrc || null;
+  const proxySrc = resolvedUrl ? iconProxyUrl(resolvedUrl) : null;
+  const [src, setSrc] = useState<string | null>(directSrc);
   const health: HealthLevel = resolution?.status ?? 'unknown';
-  const grayed = health === 'timeout' || health === 'unhealthy';
+  const grayed = isOnline && (health === 'timeout' || health === 'unhealthy');
+
+  useEffect(() => {
+    let revoked: string | null = null;
+    let cancelled = false;
+    const keys = [app.id, app.url, resolvedUrl].filter(Boolean);
+    (async () => {
+      for (const key of keys) {
+        const cached = await getCachedIcon(key);
+        if (cancelled) {
+          if (cached) URL.revokeObjectURL(cached);
+          return;
+        }
+        if (cached) {
+          revoked = cached;
+          setSrc(cached);
+          break;
+        }
+      }
+      if (!revoked && directSrc) setSrc(directSrc);
+      const upgradeFrom = proxySrc || directSrc;
+      if (!upgradeFrom) return;
+      const upgraded = await persistIconFromUrl(app.id, upgradeFrom);
+      if (cancelled || !upgraded) return;
+      const cached = await getCachedIcon(app.id);
+      if (!cached) return;
+      if (revoked) URL.revokeObjectURL(revoked);
+      revoked = cached;
+      setSrc(cached);
+    })();
+    return () => {
+      cancelled = true;
+      if (revoked) URL.revokeObjectURL(revoked);
+    };
+  }, [app.id, app.url, directSrc, proxySrc, resolvedUrl]);
 
   const open = () => {
     if (!resolvedUrl) return;
@@ -75,7 +116,14 @@ export default function AppTile({
             component="img"
             src={src}
             alt=""
-            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={() => {
+              if (src !== directSrc && directSrc) {
+                setSrc(directSrc);
+                return;
+              }
+              setSrc(null);
+            }}
+            sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
           />
         ) : (
           <Typography sx={{ fontWeight: 700, fontSize: size * 0.42 }}>{letterFor(app.name)}</Typography>

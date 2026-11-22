@@ -10,6 +10,8 @@ import Stack from '@mui/material/Stack';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
 import ConnectionChip from '../components/ConnectionChip';
+import InstallButton from '../components/InstallButton';
+import PwaFooter from '../components/PwaFooter';
 import { useDashboardContext } from '../context/DashboardContext';
 import type { HealthLevel } from '../types';
 import { appUrls } from '../utils/urls';
@@ -34,6 +36,7 @@ export default function HealthCheck() {
         <Typography variant="h6" sx={{ flex: 1 }}>
           Health
         </Typography>
+        <InstallButton />
         <ConnectionChip />
       </Box>
       <Container maxWidth="sm">
@@ -82,6 +85,7 @@ export default function HealthCheck() {
           )}
         </List>
       </Container>
+      <PwaFooter />
     </Box>
   );
 }
